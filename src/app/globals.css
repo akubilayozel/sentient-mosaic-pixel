@@ -129,3 +129,28 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 /* Butonlar */
 .modal .panel .actions button { min-width: 88px; }
 .modal .panel .actions .danger { background: #ef4444; border-color: #ef4444; }
+/* --- Modal tıklanabilirlik ve üstte görünme için kesin çözüm --- */
+.modal, .Modal, [role="dialog"], .modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  background: rgba(0,0,0,.35) !important;
+  z-index: 2147483647 !important; /* tarayıcının en üstü */
+  pointer-events: auto !important;
+}
+
+/* İç panel ve tüm çocuklar tıklanabilsin */
+.modal .panel, .Modal .panel, [role="dialog"] .panel, .modal-backdrop > * {
+  pointer-events: auto !important;
+  background: #fff !important;
+  width: min(92vw, 720px) !important;
+  max-height: 90vh !important;
+  overflow: auto !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2) !important;
+  padding: 16px !important;
+}
+
+/* Eski bir stil pointer-events:none; bıraktıysa hepsini geçersiz kıl */
+.modal *, .Modal * { pointer-events: auto !important; }
