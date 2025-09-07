@@ -1,156 +1,54 @@
-/* ====== Base ====== */
+/* ========== Reset & Base ========== */
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   color: #111;
   background: #fff;
 }
-a { color: inherit; text-decoration: none; }
-img { max-width: 100%; display: block; }
-button {
-  font: inherit;
-  background: #111;
-  color: #fff;
-  border: 1px solid #111;
-  border-radius: 12px;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-button.ghost {
-  background: #fff;
-  color: #111;
-  border-color: #e5e7eb;
-}
-button:disabled { opacity: .6; cursor: not-allowed; }
 
-/* ====== Layout ====== */
+/* ========== Layout ========== */
 .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .header h1 { font-size: 18px; margin: 0; }
-.badge { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #f3f4f6; font-size: 12px; }
+.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #f4f4f5; font-size: 12px; color: #374151; }
 
-/* Bilgi kutusu */
-.instructions {
-  padding: 12px 14px;
-  border: 1px dashed #e5e7eb;
-  border-radius: 12px;
-  background: #fafafa;
-  color: #1f2937;
-}
-.instructions ol { margin: 8px 0; padding-left: 18px; }
-
-/* ====== Mosaic / Canvas ====== */
-.gridlayout { display: grid; grid-template-columns: repeat(var(--GRID, 20), 1fr); gap: 2px; align-items: start; }
+.gridlayout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
 @media (max-width: 980px) { .gridlayout { grid-template-columns: 1fr; } }
 
-.square { display: grid; gap: 10px; }
-.canvas { width: 100%; aspect-ratio: 1/1; background: #fff; }
+/* ========== Instructions ========== */
+.instructions { padding: 12px 14px; border: 1px dashed #e5e7eb; border-radius: 12px; background: #fafafa; color: #374151; }
+.instructions ol { margin: 8px 0; padding-left: 18px; }
 
-/* Hücre */
-.cell { border: 1px dashed #e5e7eb; background: #fafafa; }
-.cell.valid { background: #fff; cursor: pointer; transition: opacity .12s, outline-color .12s; }
-.cell.valid:hover { opacity: .9; outline: 2px solid #111; }
-.cell.claimed { background: #111; opacity: .08; pointer-events: none; }
+/* ========== Mosaic ========== */
+.mosaic { display: grid; gap: 10px; }
 
-/* Açıklama kutuları */
-.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-.legend .badge { display: inline-block; height: 14px; width: 14px; border: 1px solid #e5e7eb; border-radius: 3px; }
-.legend .l1 { background: #fff; }
-.legend .l2 { background: #111; opacity: .05; }
-
-/* ====== Feed (sağ taraf) ====== */
-.feed {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  max-height: calc(100vh - 160px);
-  overflow: auto;
+.square { width: 100%; aspect-ratio: 1 / 1; display: grid; gap: 2px; background: #fff; }
+.cell {
+  border: 1px dashed #e5e7eb;
+  background: #fafafa;
+  outline: none;
 }
+.cell.valid {
+  background: #fff;
+  cursor: pointer;
+  transition: opacity .12s, outline-color .12s;
+}
+.cell.valid:hover, .cell.valid:focus { opacity: .9; outline: 2px solid #111; }
+.cell.claimed { background: #d4d4d8; cursor: not-allowed; }
+
+.legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; font-size: 12px; }
+.legend .l1, .legend .l2, .legend .l3 {
+  display: inline-block; width: 14px; height: 14px; border: 1px solid #e5e7eb; border-radius: 4px; margin-right: 6px;
+}
+.legend .l1 { background: #fff; }
+.legend .l2 { background: #d4d4d8; }
+.legend .l3 { background: #f4f4f5; }
+
+/* ========== Feed ========== */
+.feed { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; max-height: calc(100vh - 168px); overflow: auto; }
 .feedhead {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 8px; border-bottom: 1px solid #f4f4f5;
-  position: sticky; top: 0; background: #fff; z-index: 1;
-}
-.card {
-  display: grid; grid-template-columns: 56px 1fr; gap: 12px;
-  padding: 10px; border-bottom: 1px solid #f4f4f5;
-}
-.avatar {
-  width: 48px; height: 48px; border-radius: 50%;
-  object-fit: cover; border: 1px solid #e5e7eb;
-}
-.handle { font-weight: 600; }
-.note { white-space: pre-wrap; }
-.meta { color: #787878; font-size: 12px; margin-top: 4px; }
-
-/* ====== Modal ====== */
-/* Overlay: üstte ve tıklanabilir */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.35);
-  z-index: 9999;
-  pointer-events: auto; /* çocuklar (panel) tıklanabilir kalsın */
-}
-
-/* İç panel */
-.modal .panel {
-  pointer-events: auto;
-  background: #fff;
-  width: min(92vw, 720px);
-  max-height: 90vh;
-  overflow: auto;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2);
-  padding: 16px;
-}
-
-.modal .panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.modal .panel footer { display: flex; gap: 8px; justify-content: flex-end; }
-
-/* Form kontrolleri */
-.modal .panel input[type="text"],
-.modal .panel input[type="file"],
-.modal .panel textarea {
-  width: 100%;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #fff;
-}
-.modal .panel textarea { min-height: 120px; resize: vertical; }
-.modal .panel .row { margin: 12px 0; }
-
-/* Butonlar */
-.modal .panel .actions button { min-width: 88px; }
-.modal .panel .actions .danger { background: #ef4444; border-color: #ef4444; }
-/* --- Modal tıklanabilirlik ve üstte görünme için kesin çözüm --- */
-.modal, .Modal, [role="dialog"], .modal-backdrop {
-  position: fixed !important;
-  inset: 0 !important;
-  display: grid !important;
-  place-items: center !important;
-  background: rgba(0,0,0,.35) !important;
-  z-index: 2147483647 !important; /* tarayıcının en üstü */
-  pointer-events: auto !important;
-}
-
-/* İç panel ve tüm çocuklar tıklanabilsin */
-.modal .panel, .Modal .panel, [role="dialog"] .panel, .modal-backdrop > * {
-  pointer-events: auto !important;
-  background: #fff !important;
-  width: min(92vw, 720px) !important;
-  max-height: 90vh !important;
-  overflow: auto !important;
-  border-radius: 12px !important;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2) !important;
-  padding: 16px !important;
-}
-
-/* Eski bir stil pointer-events:none; bıraktıysa hepsini geçersiz kıl */
-.modal *, .Modal * { pointer-events: auto !important; }
+  padding: 6px 8px; border-bottom: 1px solid #f4f4f5; position:
