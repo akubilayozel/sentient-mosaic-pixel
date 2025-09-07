@@ -1,169 +1,58 @@
-/* ========== Reset & Base ========== */
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0;
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   color: #111;
+  background: #f7f7f8;
+}
+
+.header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
+.header h1 { font-size: 18px; margin: 0; }
+.instructions { margin: 0; padding-left: 18px; }
+
+.gridLayout { gap: 6px; }
+@media (max-width: 900px) { .gridLayout { gap: 3px; } }
+
+.cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #fff;
+  border: 1px dashed #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity .12s;
+  outline: 0;
+}
+.cell:hover { opacity: .9; outline: 1px solid #65a30d; }
+.cell:disabled { background: #f3f4f6; cursor: not-allowed; }
+.cell.claimed { background: #d1fae5; border: 1px solid #10b981; }
+
+.feed {
+  margin-top: 16px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+.note { white-space: pre-wrap; }
+
+/* Basit form */
+.label { display:block; font-size: 12px; margin: 6px 0 4px; }
+.input, .textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background: #fff;
 }
-
-/* ========== Layout ========== */
-.container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
-
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.header h1 { font-size: 18px; margin: 0; }
-.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #f4f4f5; font-size: 12px; color: #374151; }
-
-.gridlayout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
-@media (max-width: 980px) { .gridlayout { grid-template-columns: 1fr; } }
-
-/* ========== Instructions ========== */
-.instructions { padding: 12px 14px; border: 1px dashed #e5e7eb; border-radius: 12px; background: #fafafa; color: #374151; }
-.instructions ol { margin: 8px 0; padding-left: 18px; }
-
-/* ========== Mosaic ========== */
-.mosaic { display: grid; gap: 10px; }
-
-.square { width: 100%; aspect-ratio: 1 / 1; display: grid; gap: 2px; background: #fff; }
-.cell {
-  border: 1px dashed #e5e7eb;
-  background: #fafafa;
-  outline: none;
-}
-.cell.valid {
+.textarea { resize: vertical; min-height: 90px; }
+button {
+  appearance: none;
+  border: 1px solid #e5e7eb;
+  padding: 8px 10px;
+  border-radius: 8px;
   background: #fff;
   cursor: pointer;
-  transition: opacity .12s, outline-color .12s;
 }
-.cell.valid:hover, .cell.valid:focus { opacity: .9; outline: 2px solid #111; }
-.cell.claimed { background: #d4d4d8; cursor: not-allowed; }
-
-.legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; font-size: 12px; }
-.legend .l1, .legend .l2, .legend .l3 {
-  display: inline-block; width: 14px; height: 14px; border: 1px solid #e5e7eb; border-radius: 4px; margin-right: 6px;
-}
-.legend .l1 { background: #fff; }
-.legend .l2 { background: #d4d4d8; }
-.legend .l3 { background: #f4f4f5; }
-
-/* ========== Feed ========== */
-.feed { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; max-height: calc(100vh - 168px); overflow: auto; }
-.feedhead {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 8px; border-bottom: 1px solid #f4f4f5; position: sticky; top: 0; background: #fff; z-index: 1;
-}
-.card { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 10px; border-bottom: 1px solid #f4f4f5; }
-.avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid #e5e7eb; }
-.handle { font-weight: 600; }
-.note { white-space: pre-wrap; margin-top: 4px; color: #111; }
-.meta { font-size: 12px; margin-top: 4px; color: #6b7280; }
-
-/* ========== Buttons (generic) ========== */
-.btn {
-  appearance: none; border: 0; border-radius: 10px;
-  padding: 8px 12px; font-weight: 600; cursor: pointer;
-}
-.btn.primary { background: #111; color: #fff; }
-.btn.ghost   { background: #f4f4f5; color: #111; }
-
-/* ========== FORM helpers (global) ========== */
-input[type="text"], input[type="file"], textarea {
-  width: 100%;
-  border: 1px solid #e5e7eb;
-  background: #fafafa;
-  color: #111;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  outline: none;
-}
-textarea { min-height: 120px; resize: vertical; }
-
-/* =========================================
-   ===========  MODAL (stable)  =============
-   ========================================= */
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* wrapper tıklanmasın; panel/backdrop tıklansın */
-  pointer-events: none;
-}
-
-/* arka plan */
-.modal .backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(2px);
-  pointer-events: auto; /* backdrop click çalışır */
-}
-
-/* panel */
-.modal .panel {
-  position: relative;
-  z-index: 1001;
-  width: min(560px, 92vw);
-  max-width: 560px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(0,0,0,.2);
-  padding: 16px;
-  pointer-events: auto; /* panel ve içi tıklanabilir */
-}
-
-/* panel başlık/altlık */
-.modal .panel header,
-.modal .panel footer {
-  display: flex; gap: 8px; justify-content: space-between; align-items: center;
-}
-.modal .panel footer { justify-content: flex-end; margin-top: 12px; }
-
-/* panel içi formlar modal özel */
-.modal .panel input[type="text"],
-.modal .panel input[type="file"],
-.modal .panel textarea {
-  width: 100%;
-  border: 1px solid #e5e7eb;
-  background: #fafafa;
-  color: #111;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  outline: none;
-}
-.modal .panel textarea { min-height: 120px; resize: vertical; }
-
-/* aksiyonlar */
-.modal .actions {
-  display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;
-}
-.modal .actions .btn { border-radius: 10px; padding: 8px 12px; }
-.modal .actions .btn.primary { background: #111; color: #fff; }
-.modal .actions .btn.ghost   { background: #f4f4f5; color: #111; }
-
-/* garanti için: panel içindekiler tıklanır */
-.modal .panel, .modal .panel * { pointer-events: auto !important; }
-/* ==== Emergency Modal Focus Patch v2 ==== */
-/* Modal genel: sadece panel ve backdrop tıklanabilsin */
-.modal{ position:fixed; inset:0; z-index:99999 !important; pointer-events:none !important; }
-
-/* Backdrop tıklanabilir (kapatma için) */
-.modal .backdrop{ pointer-events:auto !important; }
-
-/* Panel ve içindekiler tıklanabilir / yazılabilir */
-.modal .panel,
-.modal .panel *{
-  pointer-events:auto !important;
-  z-index:100000 !important;
-}
-
-/* Güvenlik için: grid tarafında kendi boyama bağlamını oluştur (üstte kalma/çakışma sorunlarını azaltır) */
-.gridlayout, .mosaic, .square, .cell{ contain: layout paint; }
-
-/* Bazı temalarda label'lar input'un üstünü kaplayabiliyor */
-.modal .panel label{ pointer-events:none; }
+button[disabled] { opacity: .6; cursor: not-allowed; }
