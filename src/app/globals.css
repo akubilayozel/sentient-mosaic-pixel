@@ -148,3 +148,22 @@ textarea { min-height: 120px; resize: vertical; }
 
 /* garanti için: panel içindekiler tıklanır */
 .modal .panel, .modal .panel * { pointer-events: auto !important; }
+/* ==== Emergency Modal Focus Patch v2 ==== */
+/* Modal genel: sadece panel ve backdrop tıklanabilsin */
+.modal{ position:fixed; inset:0; z-index:99999 !important; pointer-events:none !important; }
+
+/* Backdrop tıklanabilir (kapatma için) */
+.modal .backdrop{ pointer-events:auto !important; }
+
+/* Panel ve içindekiler tıklanabilir / yazılabilir */
+.modal .panel,
+.modal .panel *{
+  pointer-events:auto !important;
+  z-index:100000 !important;
+}
+
+/* Güvenlik için: grid tarafında kendi boyama bağlamını oluştur (üstte kalma/çakışma sorunlarını azaltır) */
+.gridlayout, .mosaic, .square, .cell{ contain: layout paint; }
+
+/* Bazı temalarda label'lar input'un üstünü kaplayabiliyor */
+.modal .panel label{ pointer-events:none; }
