@@ -9,9 +9,14 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET as string,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID as string,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID as string,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID as string,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID as string | undefined,
 };
 
+// Tek instance
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
+
+// Varsayılan bucket bazen sorun çıkarabiliyor; bucket URL’sini açıkça veriyoruz.
+const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+const bucketUrl = bucket.startsWith('gs://') ? bucket : `gs://${bucket}`;
+export const storage = getStorage(app, bucketUrl);
