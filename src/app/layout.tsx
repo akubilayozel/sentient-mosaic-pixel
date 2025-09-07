@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Sentient Mosaic',
-  description: 'Community mosaic for Sentient'
+  description: 'Community mosaic for Sentient',
 };
 
 import './globals.css';
