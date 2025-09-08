@@ -1,208 +1,243 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import {
-  addDoc,
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore';
+import React, { useMemo, useState } from 'react';
 import { db, storage } from '@/lib/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
 const GRID = 20; // 20x20 = 400 slot
 const TOTAL_SLOTS = GRID * GRID;
 
-type Claim = {
-  slot: number;
+type FormState = {
   handle: string;
   note: string;
-  avatarUrl?: string;
-  createdAt?: any;
+  file: File | null;
 };
 
 export default function Page() {
-  const [openSlot, setOpenSlot] = useState<number | null>(null);
-  const [handle, setHandle] = useState('@kullanici');
-  const [note, setNote] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const slots = useMemo(() => Array.from({ length: TOTAL_SLOTS }, (_, i) => i), []);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [claims, setClaims] = useState<Record<number, Claim>>({});
 
-  // Canlı olarak kayıtları çek
-  useEffect(() => {
-    const q = query(collection(db, 'claims'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      const map: Record<number, Claim> = {};
-      snap.forEach((d) => {
-        const c = d.data() as Claim;
-        if (typeof c.slot === 'number') map[c.slot] = c;
-      });
-      setClaims(map);
-    });
-    return () => unsub();
-  }, []);
+  const [form, setForm] = useState<FormState>({
+    handle: '',
+    note: '',
+    file: null,
+  });
 
-  const grid = useMemo(() => Array.from({ length: TOTAL_SLOTS }, (_, i) => i), []);
+  function resetForm() {
+    setForm({ handle: '', note: '', file: null });
+    setSelected(null);
+    setOpen(false);
+    setSubmitting(false);
+  }
 
-  const isClaimed = (i: number) => !!claims[i];
-
-  // Basit validasyon
-  const isValid = openSlot !== null && handle.trim().length > 1;
-
-  async function onSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid || submitting || openSlot === null) return;
+    if (submitting) return;
 
+    // Basit validasyon
+    if (selected == null) return alert('Lütfen bir slot seçin.');
+    const handle = form.handle.trim();
+    if (!handle) return alert('Twitter kullanıcı adını girin.');
+    const note = form.note.trim();
+
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-
-      let avatarUrl: string | undefined = undefined;
-      if (file) {
-        const key = `avatars/${Date.now()}-${file.name}`.replace(/\s+/g, '-');
-        const r = ref(storage, key);
-        await uploadBytes(r, file);
-        avatarUrl = await getDownloadURL(r);
-      }
-
-      await addDoc(collection(db, 'claims'), {
-        slot: openSlot,
+      // Ortak alanlar
+      const base = {
         handle,
         note,
-        avatarUrl,
+        slot: selected,
         createdAt: serverTimestamp(),
-      });
+      };
 
-      // Temizle + kapat
-      setFile(null);
-      setNote('');
-      setOpenSlot(null);
-      alert('Kaydın alındı ✔️');
+      // Dosya varsa yükle
+      let avatarUrl: string | undefined = undefined;
+      if (form.file) {
+        const fileRef = ref(
+          storage,
+          `avatars/${(globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))}-${form.file.name}`,
+        );
+        const snap = await uploadBytes(fileRef, form.file);
+        avatarUrl = await getDownloadURL(snap.ref);
+      }
+
+      // 🔑 avatarUrl sadece varsa ekle (undefined gönderME)
+      const payload = avatarUrl ? { ...base, avatarUrl } : base;
+
+      await addDoc(collection(db, 'claims'), payload);
+
+      alert('Kayıt alındı. Teşekkürler!');
+      resetForm();
     } catch (err: any) {
       console.error(err);
-      alert(err?.message ?? 'Bir hata oluştu');
-    } finally {
+      alert(err?.message ?? 'Bir hata oluştu.');
       setSubmitting(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 980, margin: '24px auto', padding: 12 }}>
-      <header className="header">
-        <h1>Sentient Mosaic</h1>
-        <ol className="instructions">
-          <li>Logodan bir pixel seç</li>
-          <li>Twitter kullanıcı adını yaz</li>
-          <li>Profil fotoğrafını ekle</li>
-          <li>Sentient hakkında düşüncelerini yaz</li>
-        </ol>
-      </header>
+    <main style={{ padding: 24 }}>
+      <h1 style={{ marginBottom: 12 }}>Sentient Mosaic</h1>
 
-      {/* GRID */}
+      <ol style={{ marginBottom: 16, lineHeight: 1.5 }}>
+        <li>Logodan bir piksel seç</li>
+        <li>Twitter kullanıcı adını yaz</li>
+        <li>Profil fotoğrafını ekle (opsiyonel)</li>
+        <li>Sentient hakkında düşüncelerini yaz (opsiyonel)</li>
+      </ol>
+
+      {/* Izgara */}
       <div
-        className="gridLayout"
         style={{
           display: 'grid',
-          gap: 8,
-          gridTemplateColumns: `repeat(${GRID}, 1fr)`,
-          gridTemplateRows: `repeat(${GRID}, 1fr)`,
+          gridTemplateColumns: `repeat(${GRID}, 24px)`,
+          gridTemplateRows: `repeat(${GRID}, 24px)`,
+          gap: 4,
+          userSelect: 'none',
         }}
       >
-        {grid.map((i) => {
-          const claimed = isClaimed(i);
-          return (
-            <button
-              key={i}
-              className={`cell ${claimed ? 'claimed' : ''}`}
-              aria-label={`Hücre ${i + 1}`}
-              onClick={() => (!claimed ? setOpenSlot(i) : undefined)}
-              disabled={claimed}
-              title={claimed ? 'Bu slot alınmış' : 'Seçilebilir'}
-            />
-          );
-        })}
+        {slots.map((i) => (
+          <button
+            key={i}
+            title={`Slot #${i}`}
+            onClick={() => {
+              setSelected(i);
+              setOpen(true);
+            }}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 4,
+              border: '1px solid #ddd',
+              background: '#f5f5f5',
+              cursor: 'pointer',
+            }}
+          />
+        ))}
       </div>
 
-      <aside className="feed">
-        <strong>Topluluk Notları</strong>
-        <div className="note">Kayıtlar burada listelenir…</div>
-      </aside>
-
-      {/* MODAL */}
-      {openSlot !== null && (
+      {/* Modal */}
+      {open && (
         <div
-          // “nükleer” inline stil: z-index tepe, klik alır, panel merkezi
+          role="dialog"
+          aria-modal="true"
           style={{
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 9999,
           }}
-          onClick={() => setOpenSlot(null)} // backdrop tıklayınca kapansın
+          onClick={() => {
+            if (!submitting) setOpen(false);
+          }}
         >
-          <div
+          <form
+            onSubmit={handleSubmit}
+            onClick={(e) => e.stopPropagation()}
             style={{
-              width: 520,
-              maxWidth: 'calc(100vw - 32px)',
+              width: 540,
+              maxWidth: '92vw',
               background: '#fff',
-              borderRadius: 14,
-              boxShadow: '0 10px 30px rgba(0,0,0,.25)',
+              borderRadius: 12,
               padding: 16,
+              boxShadow: '0 10px 30px rgba(0,0,0,.2)',
             }}
-            onClick={(e) => e.stopPropagation()} // panel içindeki tıklar panelde kalsın
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <strong>Pixel Al (slot #{openSlot + 1})</strong>
-              <button onClick={() => setOpenSlot(null)}>Kapat</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>Pixel AI (slot #{selected})</strong>
+              <button
+                type="button"
+                onClick={() => !submitting && setOpen(false)}
+                style={{ border: 0, background: 'transparent', cursor: 'pointer' }}
+              >
+                Kapat
+              </button>
             </div>
 
-            <form onSubmit={onSubmit}>
-              <label className="label">Twitter kullanıcı adı</label>
-              <input
-                type="text"
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                className="input"
-                placeholder="@kullanici"
-              />
+            <div style={{ height: 8 }} />
 
-              <label className="label" style={{ marginTop: 8 }}>
-                Profil fotoğrafı (max 2MB)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="input"
-              />
+            {/* Handle */}
+            <label style={{ fontSize: 12, opacity: 0.75 }}>Twitter kullanıcı adı</label>
+            <input
+              type="text"
+              placeholder="@kullanici"
+              value={form.handle}
+              onChange={(e) => setForm((s) => ({ ...s, handle: e.target.value }))}
+              style={inputStyle}
+            />
 
-              <label className="label" style={{ marginTop: 8 }}>
-                Notun (280 karakter)
-              </label>
-              <textarea
-                rows={5}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="textarea"
-              />
+            {/* File */}
+            <label style={{ fontSize: 12, opacity: 0.75 }}>Profil fotoğrafı (max ~2MB)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setForm((s) => ({ ...s, file: f }));
+              }}
+              style={inputStyle}
+            />
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                <button type="button" onClick={() => setOpenSlot(null)}>
-                  İptal
-                </button>
-                <button type="submit" disabled={!isValid || submitting}>
-                  {submitting ? 'Gönderiliyor…' : 'Gönder'}
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Note */}
+            <label style={{ fontSize: 12, opacity: 0.75 }}>Notun (280 karakter)</label>
+            <textarea
+              rows={5}
+              maxLength={280}
+              value={form.note}
+              onChange={(e) => setForm((s) => ({ ...s, note: e.target.value }))}
+              style={{ ...inputStyle, resize: 'vertical' }}
+            />
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => !submitting && setOpen(false)}
+                disabled={submitting}
+                style={ghostBtn}
+              >
+                İptal
+              </button>
+              <button type="submit" disabled={submitting} style={primaryBtn}>
+                {submitting ? 'Gönderiliyor…' : 'Gönder'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
-    </div>
+    </main>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'block',
+  margin: '6px 0 12px',
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid #dadce0',
+  outline: 'none',
+  fontSize: 14,
+};
+
+const primaryBtn: React.CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 8,
+  border: 0,
+  background: '#111827',
+  color: '#fff',
+  cursor: 'pointer',
+};
+
+const ghostBtn: React.CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 8,
+  border: '1px solid #e5e7eb',
+  background: '#fff',
+  color: '#111827',
+  cursor: 'pointer',
+};
