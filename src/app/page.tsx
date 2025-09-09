@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/page.tsx  — dosyanın en başı böyle başlayacak
 'use client';
 
 import React, { useState } from 'react';
@@ -11,13 +11,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-// Sadece NAMED import: default import YOK
+// ❗ Sadece NAMED import — default import kesinlikle yok
 import { db, storage } from '@/lib/firebase';
-
-export default function Page() {
-  const [handle, setHandle] = useState('@kullanici');
-  const [note, setNote] = useState('');
-  const [file, setFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0); // 0–100
