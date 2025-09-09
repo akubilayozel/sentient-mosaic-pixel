@@ -25,7 +25,7 @@ export default function Page() {
 
   const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '—';
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setErr('');
