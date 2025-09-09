@@ -2,8 +2,38 @@
 
 import { useRef, useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  ref as storageRef,
+  uploadBytesResumable,
+  getDownloadURL,
+} from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
+
+function uploadWithProgress(ref: ReturnType<typeof storageRef>, file: File) {
+  return new Promise<string>( (resolve, reject) => {
+    const task = uploadBytesResumable(ref, file, { contentType: file.type || 'application/octet-stream' });
+
+    task.on(
+      'state_changed',
+      // progress (istersen gösterilebilir)
+      () => {},
+      // error
+      (err) => reject(err),
+      // complete
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+        resolve(url);
+        } catch (e) {
+          reject(e);
+        }
+      }
+    );
+  });
+}
+
+const timeout = (ms: number) =>
+  new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Upload timeout')), ms));
 
 export default function Page() {
   const [handle, setHandle] = useState('@kullanici');
@@ -12,41 +42,50 @@ export default function Page() {
   const [msg, setMsg] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // debug: aktif bucket’ı göstereceğiz
+  const activeBucket = (storage as any)?.app?.options?.storageBucket || '(yok)';
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg('');
     setLoading(true);
 
     try {
-      // 1) (opsiyonel) Fotoğrafı Storage’a yükle
       let avatarUrl: string | null = null;
       const file = fileInput.current?.files?.[0] ?? null;
 
       if (file) {
-        // Güvenli dosya adı + klasör yolu
+        setMsg('📤 Upload başlıyor…');
+
         const safeName = file.name.replace(/[^\w.-]/g, '_');
         const path = `avatars/${Date.now()}_${safeName}`;
-        const objectRef = storageRef(storage, path);
+        const objRef = storageRef(storage, path);
 
-        // Küçük dosyalar için yeterli ve deterministik: uploadBytes
-        await uploadBytes(objectRef, file, { contentType: file.type });
-        avatarUrl = await getDownloadURL(objectRef);
+        // resumable + timeout birlikte
+        avatarUrl = await Promise.race([
+          uploadWithProgress(objRef, file),
+          timeout(20000),
+        ]);
+
+        setMsg('✅ Upload bitti, URL alındı.');
+      } else {
+        setMsg('📄 Fotoğraf yok, sadece kayıt yazılacak…');
       }
 
-      // 2) Firestore’a kaydı yaz
       const docRef = await addDoc(collection(db, 'claims'), {
         handle: handle.trim(),
         note: note.trim() || null,
-        avatarUrl,                 // yoksa null
+        avatarUrl,
         createdAt: serverTimestamp(),
       });
 
-      setMsg(`✅ Kayıt eklendi: ${docRef.id}${avatarUrl ? ' (görsel yüklendi)' : ''}`);
-      // İstersen formu sıfırlamak istersen:
-      // setHandle('@kullanici');
-      // setNote('');
+      setMsg(
+        `✅ Kayıt eklendi: ${docRef.id}${avatarUrl ? ' (görsel yüklendi)' : ''}`
+      );
+
       if (fileInput.current) fileInput.current.value = '';
     } catch (err: any) {
+      console.error(err);
       setMsg(`❌ Hata: ${err?.message ?? String(err)}`);
     } finally {
       setLoading(false);
@@ -57,6 +96,9 @@ export default function Page() {
     <main style={{ maxWidth: 560, margin: '48px auto', fontFamily: 'ui-sans-serif, system-ui' }}>
       <h1>Sentient Mosaic — Minimal Test</h1>
       <p>Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a yükleyelim.</p>
+
+      {/* debug: aktif bucket */}
+      <p style={{fontSize:12,opacity:.7}}>Aktif bucket: <code>{activeBucket}</code></p>
 
       <form onSubmit={onSubmit}>
         <label style={{ display: 'block', margin: '16px 0 6px' }}>
