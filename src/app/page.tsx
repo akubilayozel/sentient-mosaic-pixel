@@ -8,13 +8,9 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import {
-  getDownloadURL,
-  ref,
-  uploadBytesResumable,
-} from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-// 🔴 DİKKAT: named import!
+// 👉 DİKKAT: named import (default import yok)
 import { db, storage } from '@/lib/firebase';
 
 export default function Page() {
@@ -27,8 +23,7 @@ export default function Page() {
   const [msg, setMsg] = useState<string>('');
   const [err, setErr] = useState<string>('');
 
-  const bucket =
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '—';
+  const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '—';
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +33,7 @@ export default function Page() {
     setProgress(0);
 
     try {
-      // 1) Önce Firestore’a temel kaydı at
+      // 1) Firestore’a temel kaydı at
       const payload = {
         handle: handle.trim(),
         note: note.trim() || null,
@@ -50,7 +45,7 @@ export default function Page() {
       const col = collection(db, 'claims');
       const docRef = await addDoc(col, payload);
 
-      // 2) Fotoğraf varsa Storage’a yükle ve kayıtı güncelle
+      // 2) Fotoğraf varsa Storage’a yükle ve kaydı güncelle
       if (file) {
         const safeName = file.name.replace(/\s+/g, '-');
         const path = `avatars/${docRef.id}/${Date.now()}-${safeName}`;
@@ -60,7 +55,6 @@ export default function Page() {
           cacheControl: 'public, max-age=31536000',
         });
 
-        // Task’ı promise’e sar – ZAMAN AŞIMI YOK
         await new Promise<void>((resolve, reject) => {
           task.on(
             'state_changed',
