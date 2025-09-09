@@ -1,9 +1,18 @@
+// src/app/page.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase'; // ⬅️ named import – default import YOK
+
+// Sadece NAMED import: default import YOK
+import { db, storage } from '@/lib/firebase';
 
 export default function Page() {
   const [handle, setHandle] = useState('@kullanici');
@@ -17,7 +26,7 @@ export default function Page() {
 
   const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '—';
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setErr('');
@@ -25,7 +34,7 @@ export default function Page() {
     setProgress(0);
 
     try {
-      // 1) Firestore’a temel kaydı yaz
+      // 1) Firestore’a temel kaydı at
       const payload = {
         handle: handle.trim(),
         note: note.trim() || null,
@@ -34,10 +43,10 @@ export default function Page() {
         avatarPath: null as string | null,
       };
 
-      const colRef = collection(db, 'claims');
-      const docRef = await addDoc(colRef, payload);
+      const col = collection(db, 'claims');
+      const docRef = await addDoc(col, payload);
 
-      // 2) Dosya varsa Storage’a yükle → Firestore kaydını güncelle
+      // 2) Fotoğraf varsa Storage’a yükle ve kaydı güncelle
       if (file) {
         const safeName = file.name.replace(/\s+/g, '-');
         const path = `avatars/${docRef.id}/${Date.now()}-${safeName}`;
@@ -50,11 +59,13 @@ export default function Page() {
         await new Promise<void>((resolve, reject) => {
           task.on(
             'state_changed',
-            snap => {
-              const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+            (snap) => {
+              const pct = Math.round(
+                (snap.bytesTransferred / snap.totalBytes) * 100
+              );
               setProgress(pct);
             },
-            error => reject(error),
+            (error) => reject(error),
             async () => {
               const url = await getDownloadURL(task.snapshot.ref);
               await updateDoc(doc(db, 'claims', docRef.id), {
@@ -124,7 +135,8 @@ export default function Page() {
       </h1>
 
       <p style={{ color: '#6b7280', marginBottom: 8 }}>
-        Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a yükleyelim.
+        Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a
+        yükleyelim.
       </p>
       <p style={{ color: '#6b7280', marginTop: 0, marginBottom: 18 }}>
         <small>
@@ -133,29 +145,35 @@ export default function Page() {
       </p>
 
       <form onSubmit={onSubmit}>
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>Twitter kullanıcı adı</label>
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Twitter kullanıcı adı
+        </label>
         <input
           type="text"
           value={handle}
-          onChange={e => setHandle(e.target.value)}
+          onChange={(e) => setHandle(e.target.value)}
           placeholder="@kullanici"
           style={input}
           disabled={loading}
         />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>Profil fotoğrafı (opsiyonel)</label>
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Profil fotoğrafı (opsiyonel)
+        </label>
         <input
           type="file"
           accept="image/*"
-          onChange={e => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           style={input}
           disabled={loading}
         />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>Not (isteğe bağlı)</label>
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Not (isteğe bağlı)
+        </label>
         <textarea
           value={note}
-          onChange={e => setNote(e.target.value)}
+          onChange={(e) => setNote(e.target.value)}
           maxLength={280}
           style={{ ...input, height: 130, resize: 'vertical' }}
           disabled={loading}
@@ -166,7 +184,6 @@ export default function Page() {
         </button>
       </form>
 
-      {/* İlerleme */}
       {loading && file && (
         <div style={{ marginTop: 12 }}>
           <small style={{ color: '#6b7280' }}>⬆ Upload ilerliyor…</small>
@@ -177,7 +194,6 @@ export default function Page() {
         </div>
       )}
 
-      {/* Mesajlar */}
       {msg && (
         <p
           style={{
