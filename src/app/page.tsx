@@ -1,135 +1,113 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import {
-  ref as storageRef,
-  uploadBytesResumable,
-  getDownloadURL,
-} from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
-
-function uploadWithProgress(ref: ReturnType<typeof storageRef>, file: File) {
-  return new Promise<string>( (resolve, reject) => {
-    const task = uploadBytesResumable(ref, file, { contentType: file.type || 'application/octet-stream' });
-
-    task.on(
-      'state_changed',
-      // progress (istersen gösterilebilir)
-      () => {},
-      // error
-      (err) => reject(err),
-      // complete
-      async () => {
-        try {
-          const url = await getDownloadURL(task.snapshot.ref);
-        resolve(url);
-        } catch (e) {
-          reject(e);
-        }
-      }
-    );
-  });
-}
-
-const timeout = (ms: number) =>
-  new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Upload timeout')), ms));
+import { useState } from 'react';
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import db, { storage } from '@/lib/firebase';
 
 export default function Page() {
   const [handle, setHandle] = useState('@kullanici');
   const [note, setNote] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
-  const fileInput = useRef<HTMLInputElement>(null);
 
-  // debug: aktif bucket’ı göstereceğiz
-  const activeBucket = (storage as any)?.app?.options?.storageBucket || '(yok)';
+  const bucket = (storage as any)?.app?.options?.storageBucket ?? '(yok)';
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg('');
+    if (!handle.trim()) {
+      setMsg('Lütfen bir kullanıcı adı yaz.');
+      return;
+    }
+
+    // (opsiyonel) dosya boyutu sınırı: 3MB
+    if (file && file.size > 3 * 1024 * 1024) {
+      setMsg('Dosya çok büyük (maks 3MB). Daha küçük bir görsel seç.');
+      return;
+    }
+
     setLoading(true);
-
     try {
-      let avatarUrl: string | null = null;
-      const file = fileInput.current?.files?.[0] ?? null;
-
-      if (file) {
-        setMsg('📤 Upload başlıyor…');
-
-        const safeName = file.name.replace(/[^\w.-]/g, '_');
-        const path = `avatars/${Date.now()}_${safeName}`;
-        const objRef = storageRef(storage, path);
-
-        // resumable + timeout birlikte
-        avatarUrl = await Promise.race([
-          uploadWithProgress(objRef, file),
-          timeout(20000),
-        ]);
-
-        setMsg('✅ Upload bitti, URL alındı.');
-      } else {
-        setMsg('📄 Fotoğraf yok, sadece kayıt yazılacak…');
-      }
-
-      const docRef = await addDoc(collection(db, 'claims'), {
+      // 1) önce Firestore kaydı
+      const base = {
         handle: handle.trim(),
         note: note.trim() || null,
-        avatarUrl,
         createdAt: serverTimestamp(),
-      });
+      };
+      const refDoc = await addDoc(collection(db, 'claims'), base);
 
-      setMsg(
-        `✅ Kayıt eklendi: ${docRef.id}${avatarUrl ? ' (görsel yüklendi)' : ''}`
-      );
+      // 2) görsel varsa Storage’a tek seferde yükle (uploadBytes)
+      if (file) {
+        setMsg('📤 Yükleniyor...');
+        const path = `avatars/${refDoc.id}-${file.name}`;
+        const storageRef = ref(storage, path);
 
-      if (fileInput.current) fileInput.current.value = '';
+        // 60 sn kendi zaman aşımı
+        const timeout = (ms: number) => new Promise((_, rej) => setTimeout(() => rej(new Error('Upload timeout')), ms));
+
+        await Promise.race([
+          uploadBytes(storageRef, file, {
+            contentType: file.type || 'application/octet-stream',
+            cacheControl: 'public, max-age=31536000, immutable',
+          }),
+          timeout(60000),
+        ]);
+
+        const url = await getDownloadURL(storageRef);
+        await updateDoc(doc(db, 'claims', refDoc.id), { avatarUrl: url, storagePath: path });
+        setMsg('✅ Kayıt + görsel yüklendi.');
+      } else {
+        setMsg('✅ Kayıt eklendi (görsel yok).');
+      }
+
+      setHandle('@kullanici');
+      setNote('');
+      setFile(null);
     } catch (err: any) {
-      console.error(err);
-      setMsg(`❌ Hata: ${err?.message ?? String(err)}`);
+      setMsg(`❌ Hata: ${err?.message || String(err)}`);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: '48px auto', fontFamily: 'ui-sans-serif, system-ui' }}>
+    <main style={{ maxWidth: 680, margin: '40px auto', fontFamily: 'ui-sans-serif, system-ui' }}>
       <h1>Sentient Mosaic — Minimal Test</h1>
       <p>Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a yükleyelim.</p>
-
-      {/* debug: aktif bucket */}
-      <p style={{fontSize:12,opacity:.7}}>Aktif bucket: <code>{activeBucket}</code></p>
+      <p style={{ fontSize: 12, color: '#666' }}>Aktif bucket: <code>{bucket}</code></p>
 
       <form onSubmit={onSubmit}>
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>
-          Twitter kullanıcı adı
+        <label>Twitter kullanıcı adı
+          <input
+            type="text"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+            style={inputStyle}
+          />
         </label>
-        <input
-          type="text"
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          placeholder="@kullanici"
-          style={inputStyle}
-        />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>
-          Profil fotoğrafı (opsiyonel)
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>Profil fotoğrafı (opsiyonel)
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            style={inputStyle}
+          />
         </label>
-        <input ref={fileInput} type="file" accept="image/*" style={inputStyle} />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>
-          Not (isteğe bağlı)
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>Not (isteğe bağlı)
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={280}
+            style={{ ...inputStyle, height: 120, resize: 'vertical' }}
+          />
         </label>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          maxLength={280}
-          placeholder="Kısa bir not…"
-          style={{ ...inputStyle, height: 120, resize: 'vertical' }}
-        />
 
         <button type="submit" disabled={loading} style={primaryBtn}>
-          {loading ? 'Gönderiliyor…' : 'Gönder'}
+          {loading ? 'Gönderiliyor...' : 'Gönder'}
         </button>
       </form>
 
@@ -147,7 +125,7 @@ const inputStyle: React.CSSProperties = {
   display: 'block',
   padding: '12px',
   borderRadius: 8,
-  border: '1px solid #d0d0d6',
+  border: '1px solid #d0d9de',
   outline: 'none',
   fontSize: 14,
   background: '#fff',
@@ -155,7 +133,7 @@ const inputStyle: React.CSSProperties = {
 
 const primaryBtn: React.CSSProperties = {
   marginTop: 12,
-  padding: '10px 14px',
+  padding: '12px 14px',
   borderRadius: 8,
   border: 0,
   background: '#111827',
