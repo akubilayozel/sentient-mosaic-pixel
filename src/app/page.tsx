@@ -1,169 +1,232 @@
 'use client';
 
-import { useState } from 'react';
-import { addDoc, collection, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import db, { storage } from '@/lib/firebase';
+import React, { useState } from 'react';
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
+import {
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from 'firebase/storage';
+
+// 🔴 DİKKAT: named import!
+import { db, storage } from '@/lib/firebase';
 
 export default function Page() {
   const [handle, setHandle] = useState('@kullanici');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [progress, setProgress] = useState(0);
 
-  const bucket = (storage as any)?.app?.options?.storageBucket ?? '(yok)';
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0); // 0–100
+  const [msg, setMsg] = useState<string>('');
+  const [err, setErr] = useState<string>('');
+
+  const bucket =
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '—';
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setLoading(true);
+    setErr('');
     setMsg('');
     setProgress(0);
 
-    if (!handle.trim()) {
-      setMsg('Lütfen bir kullanıcı adı yaz.');
-      return;
-    }
-    if (file && file.size > 3 * 1024 * 1024) {
-      setMsg('Dosya çok büyük (maks 3MB). Daha küçük bir görsel seç.');
-      return;
-    }
-
-    setLoading(true);
     try {
-      // 1) Firestore kaydı
-      const docRef = await addDoc(collection(db, 'claims'), {
+      // 1) Önce Firestore’a temel kaydı at
+      const payload = {
         handle: handle.trim(),
         note: note.trim() || null,
         createdAt: serverTimestamp(),
-      });
+        avatarUrl: null as string | null,
+        avatarPath: null as string | null,
+      };
 
-      // 2) Görsel varsa Storage'a yükle (resumable + progress)
+      const col = collection(db, 'claims');
+      const docRef = await addDoc(col, payload);
+
+      // 2) Fotoğraf varsa Storage’a yükle ve kayıtı güncelle
       if (file) {
-        const path = `avatars/${docRef.id}-${file.name}`;
+        const safeName = file.name.replace(/\s+/g, '-');
+        const path = `avatars/${docRef.id}/${Date.now()}-${safeName}`;
         const storageRef = ref(storage, path);
 
-        setMsg('📤 Yükleme başladı…');
         const task = uploadBytesResumable(storageRef, file, {
-          contentType: file.type || 'application/octet-stream',
-          cacheControl: 'public, max-age=31536000, immutable',
+          cacheControl: 'public, max-age=31536000',
         });
 
-        await new Promise<string>((resolve, reject) => {
+        // Task’ı promise’e sar – ZAMAN AŞIMI YOK
+        await new Promise<void>((resolve, reject) => {
           task.on(
             'state_changed',
             (snap) => {
-              const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+              const pct = Math.round(
+                (snap.bytesTransferred / snap.totalBytes) * 100
+              );
               setProgress(pct);
-              if (pct < 100) setMsg(`📶 Yükleniyor… %${pct}`);
             },
-            (err) => reject(err),
+            (error) => reject(error),
             async () => {
               const url = await getDownloadURL(task.snapshot.ref);
-              resolve(url);
+              await updateDoc(doc(db, 'claims', docRef.id), {
+                avatarUrl: url,
+                avatarPath: path,
+              });
+              resolve();
             }
           );
-        }).then(async (url) => {
-          await updateDoc(doc(db, 'claims', docRef.id), { avatarUrl: url, storagePath: path });
-          setMsg('✅ Kayıt + görsel yüklendi.');
         });
-      } else {
-        setMsg('✅ Kayıt eklendi (görsel yok).');
       }
 
-      setHandle('@kullanici');
-      setNote('');
-      setFile(null);
-      setProgress(0);
-    } catch (err: any) {
-      setMsg(`❌ Hata: ${err?.message || String(err)}`);
+      setMsg(`✅ Kayıt eklendi: ${docRef.id}`);
+    } catch (e: any) {
+      setErr(`❌ Hata: ${e?.message ?? String(e)}`);
     } finally {
       setLoading(false);
     }
   }
 
+  // Basit stiller
+  const wrap: React.CSSProperties = {
+    maxWidth: 720,
+    margin: '56px auto',
+    padding: '0 16px',
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+  };
+  const input: React.CSSProperties = {
+    width: '100%',
+    display: 'block',
+    padding: '12px',
+    borderRadius: 8,
+    border: '1px solid #d0d7de',
+    outline: 'none',
+    fontSize: 14,
+    background: '#fff',
+  };
+  const primaryBtn: React.CSSProperties = {
+    marginTop: 12,
+    padding: '10px 14px',
+    borderRadius: 8,
+    border: 0,
+    background: '#111827',
+    color: '#fff',
+    cursor: 'pointer',
+  };
+  const progressBarWrap: React.CSSProperties = {
+    height: 8,
+    width: '100%',
+    background: '#eef2ff',
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginTop: 10,
+  };
+  const progressBar: React.CSSProperties = {
+    height: '100%',
+    width: `${progress}%`,
+    background: '#6366f1',
+    transition: 'width .2s ease',
+  };
+
   return (
-    <main style={{ maxWidth: 680, margin: '40px auto', fontFamily: 'ui-sans-serif, system-ui' }}>
-      <h1>Sentient Mosaic — Minimal Test</h1>
-      <p>Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a yükleyelim.</p>
-      <p style={{ fontSize: 12, color: '#666' }}>
-        Aktif bucket: <code>{bucket}</code>
+    <main style={wrap}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>
+        Sentient Mosaic — Minimal Test
+      </h1>
+
+      <p style={{ color: '#6b7280', marginBottom: 8 }}>
+        Önce Firestore’a basit bir kayıt atalım; varsa fotoğrafı Storage’a
+        yükleyelim.
+      </p>
+      <p style={{ color: '#6b7280', marginTop: 0, marginBottom: 18 }}>
+        <small>
+          Aktif bucket: <code>{bucket}</code>
+        </small>
       </p>
 
       <form onSubmit={onSubmit}>
-        <label>Twitter kullanıcı adı
-          <input
-            type="text"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-            style={inputStyle}
-          />
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Twitter kullanıcı adı
         </label>
+        <input
+          type="text"
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+          placeholder="@kullanici"
+          style={input}
+          disabled={loading}
+        />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>Profil fotoğrafı (opsiyonel)
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            style={inputStyle}
-          />
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Profil fotoğrafı (opsiyonel)
         </label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          style={input}
+          disabled={loading}
+        />
 
-        <label style={{ display: 'block', margin: '16px 0 6px' }}>Not (isteğe bağlı)
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={280}
-            style={{ ...inputStyle, height: 120, resize: 'vertical' }}
-          />
+        <label style={{ display: 'block', margin: '16px 0 6px' }}>
+          Not (isteğe bağlı)
         </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={280}
+          style={{ ...input, height: 130, resize: 'vertical' }}
+          disabled={loading}
+        />
 
         <button type="submit" disabled={loading} style={primaryBtn}>
           {loading ? 'Gönderiliyor…' : 'Gönder'}
         </button>
       </form>
 
-      {progress > 0 && progress < 100 && (
+      {/* İlerleme */}
+      {loading && file && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ height: 8, background: '#eee', borderRadius: 4 }}>
-            <div style={{
-              width: `${progress}%`,
-              height: 8,
-              background: '#111827',
-              borderRadius: 4,
-              transition: 'width .2s'
-            }} />
+          <small style={{ color: '#6b7280' }}>⬆ Upload ilerliyor…</small>
+          <div style={progressBarWrap}>
+            <div style={progressBar} />
           </div>
-          <small>%{progress}</small>
+          <small style={{ color: '#6b7280' }}>{progress}%</small>
         </div>
       )}
 
+      {/* Mesajlar */}
       {msg && (
-        <p style={{ background: '#f6f9f9', padding: 12, marginTop: 16, whiteSpace: 'pre-wrap' }}>
+        <p
+          style={{
+            marginTop: 16,
+            background: '#ecfdf5',
+            color: '#065f46',
+            padding: '10px 12px',
+            borderRadius: 8,
+          }}
+        >
           {msg}
+        </p>
+      )}
+      {err && (
+        <p
+          style={{
+            marginTop: 16,
+            background: '#fef2f2',
+            color: '#7f1d1d',
+            padding: '10px 12px',
+            borderRadius: 8,
+          }}
+        >
+          {err}
         </p>
       )}
     </main>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  display: 'block',
-  padding: '12px',
-  borderRadius: 8,
-  border: '1px solid #d0d9de',
-  outline: 'none',
-  fontSize: 14,
-  background: '#fff',
-};
-
-const primaryBtn: React.CSSProperties = {
-  marginTop: 12,
-  padding: '12px 14px',
-  borderRadius: 8,
-  border: 0,
-  background: '#111827',
-  color: '#fff',
-  cursor: 'pointer',
-};
